@@ -1,0 +1,45 @@
+# iac-fingerprint — IaC detection signatures
+#
+# HOW DETECTION ACTUALLY WORKS (read this before editing):
+#
+# CDK's much-referenced "aws:cdk:path" is CloudFormation *template
+# Metadata*, not a resource Tag. It never appears via the Resource
+# Groups Tagging API, on any account — so it can't be matched as a tag.
+# scan.py reads it from each stack's template instead, when present.
+#
+# For each resource, scan.py checks (strongest signal first):
+#   1. Does a stack template give it an "aws:cdk:path" construct path?
+#   2. Does CloudFormation's own resource listing (ListStackResources)
+#      place it in a live stack?
+#   3. Does it carry the "aws:cloudformation:stack-name" tag below?
+#
+# Any "yes"                -> classified "cdk".
+# None of the above        -> classified with unmatched_label ("unknown").
+#
+# Resources from hand-written CloudFormation stacks are deliberately
+# folded into "cdk" too. scan.py still notes which stacks were
+# synthesized by CDK (they have a "BootstrapVersion" parameter), but
+# does not use that to split the output. See classify_resource_ownership
+# in scan.py to separate plain CloudFormation again.
+#
+# The entry below just tells scan.py which tag key carries the stack
+# name — you generally won't need to change this unless AWS changes
+# the tag key itself.
+
+signatures:
+  cloudformation:
+    tag_key: "aws:cloudformation:stack-name"
+    reliability: "high"
+    notes: >
+      Injected by CloudFormation on many (not all) resources it manages,
+      whether deployed via CDK or a raw/hand-written template. scan.py
+      only falls back to this tag when CloudFormation's own resource
+      listing (see build_cdk_resource_lookup) doesn't place the resource
+      in a stack.
+
+# Resources with no CloudFormation involvement detected by any signal
+# are labeled with this value. "unknown" is used deliberately instead of
+# "manual" — a resource could be managed by a tool that doesn't tag
+# reliably (e.g. Terraform without a manual convention tag) without
+# actually being manually created.
+unmatched_label: "unknown"
